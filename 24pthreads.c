@@ -139,6 +139,7 @@ void* thread_solve24(void* cards) {
                 int *curr_card = my_cards->all_cards[my_cards->start + i];
                 solve24(curr_card);
         }
+        pthread_exit(NULL);
 }
  
 int main(int argc, char *argv[])
@@ -188,7 +189,7 @@ int main(int argc, char *argv[])
 
         if( clock_gettime( CLOCK_REALTIME, &stop) == -1 ) { perror("clock gettime");}           
         time = (stop.tv_sec - start.tv_sec)+ (double)(stop.tv_nsec - start.tv_nsec)/1e9;
-        printf("Execution time for 1 threads: %f ns\n", time*1e9);
+        printf("Execution time for %d threads: %f ns\n", num_threads, time*1e9);
  
         return 0;
 }
