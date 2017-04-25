@@ -6,7 +6,7 @@
 #define n_cards 4
 #define solve_goal 24
 #define max_digit 13
-#define iterations 256
+#define iterations 1024
  
 typedef struct { int num, denom; } frac_t, *frac;
 typedef enum { C_NUM = 0, C_ADD, C_SUB, C_MUL, C_DIV } op_type;
@@ -192,10 +192,10 @@ int main(int argc, char *argv[])
         printf("Execution time for %d threads: %f ns\n", num_threads, time*1e9);
 
         // release memory
-        for (j = 0; j < iterations; j++) {
-                free(all_cards[i]);
-        }
-        free(all_cards);
+        // for (j = 0; j < iterations; j++) {
+        //         free(all_cards[i]);
+        // }
+        // free(all_cards);
  
         return 0;
 }
