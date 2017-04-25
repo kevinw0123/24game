@@ -2,11 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdbool.h>
  
 #define n_cards 4
 #define solve_goal 24
 #define max_digit 13
-#define iterations 256
+#define iterations 4
  
 typedef struct { int num, denom; } frac_t, *frac;
 typedef enum { C_NUM = 0, C_ADD, C_SUB, C_MUL, C_DIV } op_type;
@@ -23,6 +24,9 @@ struct card_info {
         int start;
         int end;
 };
+
+int weights[max_digit];
+int top1, top2, top3;
  
 void show_expr(expr e, op_type prec, int is_right)
 {
@@ -75,7 +79,7 @@ void eval_expr(expr e, frac f)
                 return;
         }
 }
-int solve(expr ex_in[], int len)
+int solve(expr ex_in[], int len, int target)
 {
         int i, j;
         expr_t node;
@@ -84,8 +88,10 @@ int solve(expr ex_in[], int len)
  
         if (len == 1) {
                 eval_expr(ex_in[0], &final);
-                if (final.num == final.denom * solve_goal && final.denom) {
-                        // show_expr(ex_in[0], 0, 0);
+                if (final.num == final.denom * target && final.denom) {
+                        //if (target != 24) printf(" H(");
+                        //show_expr(ex_in[0], 0, 0);
+                        //if (target != 24) printf(") ");
                         return 1;
                 }
                 return 0;
@@ -99,15 +105,15 @@ int solve(expr ex_in[], int len)
                         node.left = ex_in[i];
                         node.right = ex_in[j];
                         for (node.op = C_ADD; node.op <= C_DIV; node.op++)
-                                if (solve(ex, len - 1))
+                                if (solve(ex, len - 1, target))
                                         return 1;
  
                         node.left = ex_in[j];
                         node.right = ex_in[i];
                         node.op = C_SUB;
-                        if (solve(ex, len - 1)) return 1;
+                        if (solve(ex, len - 1, target)) return 1;
                         node.op = C_DIV;
-                        if (solve(ex, len - 1)) return 1;
+                        if (solve(ex, len - 1, target)) return 1;
  
                         ex[j] = ex_in[j];
                 }
@@ -117,33 +123,139 @@ int solve(expr ex_in[], int len)
         return 0;
 }
  
-int solve24(int n[])
+int solve24(int n[], int number_of_cards, int target)
 {
         int i;
-        expr_t ex[n_cards];
-        expr   e[n_cards];
-        for (i = 0; i < n_cards; i++) {
+        expr_t ex[number_of_cards];
+        expr   e[number_of_cards];
+        for (i = 0; i < number_of_cards; i++) {
                 e[i] = ex + i;
                 ex[i].op = C_NUM;
                 ex[i].left = ex[i].right = 0;
                 ex[i].value = n[i];
         }
-        return solve(e, n_cards);
+        
+
+        int x = solve(e, number_of_cards, target);
+        return x;
+}
+
+
+void getTops() {
+        top1 = top2 = top3 = 0;
+        int i;
+        for (i = 1; i < max_digit; i++) {
+                if (weights[i] > weights[top1]) {
+                        top3 = top2;
+                        top2 = top1;
+                        top1 = i;
+                } else if (weights[i] > weights[top2]) {
+                        top3 = top2;
+                        top2 = i;
+                } else if (weights[i] > weights[top3]) {
+                        top3 = i;
+                }
+        }
+
 }
 
 void* thread_solve24(void* cards) {
         struct card_info *my_cards = (struct card_info*) cards;
         int num_cards = my_cards->end - my_cards->start;
-        int i;
+        int i, j, k;
         for(i = 0; i < num_cards; i++) {
                 int *curr_card = my_cards->all_cards[my_cards->start + i];
-                solve24(curr_card);
+                //printf("%d %d %d %d: ", curr_card[0], curr_card[1], curr_card[2], curr_card[3]);
+
+                bool solved = false;
+                //Cache
+                for (j = 0; j < n_cards; j++) {
+                        
+                        if (curr_card[j] == top1 || curr_card[j] == top2 || curr_card[j] == top3) {
+                                int cache_card[n_cards-1];
+                                for (k = 0; k < n_cards - 1; k++) {
+                                        if (k < j) {
+                                                cache_card[k] = curr_card[k];
+                                        } else {
+                                                cache_card[k] = curr_card[k+1];
+                                        }
+                                        
+
+                                }
+
+                                if (solve24(cache_card, n_cards - 1, curr_card[j] * 24)) {
+                                        for (k = 0; k < n_cards; k++) {
+                                                weights[curr_card[k]]++;
+                                                getTops();
+                                        }
+                                        //printf(" / %d \n", curr_card[j]);
+                                        solved = true;
+                                        break;
+                                }
+                                if (solve24(cache_card, n_cards - 1, curr_card[j] + 24)) {
+                                        for (k = 0; k < n_cards; k++) {
+                                                weights[curr_card[k]]++;
+                                                getTops();
+                                        }
+                                        //printf(" - %d \n", curr_card[j]);
+                                        solved = true;
+                                        break;
+                                        
+                                }
+                                if (solve24(cache_card, n_cards - 1, 24 - curr_card[j])) {
+                                        for (k = 0; k < n_cards; k++) {
+                                                weights[curr_card[k]]++;
+                                                getTops();
+
+                                        }
+                                        //printf(" + %d \n", curr_card[j]);
+                                        solved = true;
+                                        break;
+                                        
+                                }
+                                if (24 % curr_card[j] == 0) { //if it's not a decimal
+                                        if (solve24(cache_card, n_cards - 1, 24/curr_card[j])) {
+                                                for (k = 0; k < n_cards; k++) {
+                                                        weights[curr_card[k]]++;
+                                                        getTops();
+                                                }
+                                                //printf(" * %d \n", curr_card[j]);
+                                                solved = true;
+                                                break;
+                                                
+                                        }
+                                }
+
+                        } 
+                }
+
+                //Parallel
+                if (!solved) {
+                   if (solve24(curr_card, n_cards, 24)) {
+                           for (j = 0; j < n_cards; j++) {
+                                   weights[curr_card[j]]++;
+                                   getTops();
+                           }
+                           //printf("\n");
+                   }
+                   //else printf("No solution\n");     
+                }
+                // printf("Weights: ");
+                // int b;
+                // for (b = 0; b < max_digit; b++) {
+                //         printf("{%d, %d} , ", b, weights[b]);
+                // }
+                // printf("\n");
+        
+
         }
+
         pthread_exit(NULL);
 }
  
 int main(int argc, char *argv[])
 {
+        
         if (argc != 2) {
                 printf("Incorrect number of arguments. Remember to pass in number of threads.");
                 return(0);
@@ -151,6 +263,12 @@ int main(int argc, char *argv[])
 
         int i, j, k, rc;
         srand(time(0));
+
+        for (i = 0; i < max_digit; i++) {
+                weights[i] = 0;
+        }
+        top1 = 8; top2 = 3; top3 = 4;
+
 
         int num_threads = atoi(argv[1]);
         pthread_t threads[num_threads];
@@ -169,9 +287,9 @@ int main(int argc, char *argv[])
         for (j = 0; j < iterations; j++) {
                 for (i = 0; i < n_cards; i++) {
                         all_cards[j][i] = 1 + (double) rand() * max_digit / RAND_MAX;
-                        // printf(" %d", n[i]);
+                        //printf(" %d", all_cards[j][i]);
                 }
-                // printf(":  ");
+                //printf(":  ");
                 // printf(solve24(n) ? "\n" : "No solution\n");
         }
 
@@ -192,10 +310,10 @@ int main(int argc, char *argv[])
         printf("Execution time for %d threads: %f ns\n", num_threads, time*1e9);
 
         // release memory
-        for (j = 0; j < iterations; j++) {
-                free(all_cards[i]);
-        }
-        free(all_cards);
+        // for (j = 0; j < iterations; j++) {
+        //         free(all_cards[i]);
+        // }
+        // free(all_cards);
  
         return 0;
 }
